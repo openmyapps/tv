@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0088cc">
+<meta name="color-scheme" content="light dark">
+<title>ТВ</title>
+<style>
+:root {
+  --bg: #fff;
+  --bg-active: #e3f2fd;
+  --text: #222;
+  --text-secondary: #888;
+  --separator: #e5e5e5;
+}
+@media (prefers-color-scheme:dark) {
+  :root {
+    --bg: #17212b;
+    --bg-active: #242f3d;
+    --text: #e8e8e8;
+    --text-secondary: #6c7883;
+    --separator: #1f2b36;
+  }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  overflow-y: auto;
+}
+.stations {
+  list-style: none;
+  padding: 8px 0;
+}
+.station {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  cursor: pointer;
+  transition: background .15s;
+  user-select: none;
+}
+.station:active { background: var(--bg-active); }
+.station + .station { border-top: 1px solid var(--separator); }
+.station-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.station-name {
+  font-size: 17px;
+  font-weight: 500;
+  flex: 1;
+  line-height: 1.3;
+}
+.station-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  flex-shrink: 0;
+  transition: background .2s, box-shadow .2s;
+}
+.station.active,
+.station.connecting { background: var(--bg-active); }
+.station.active .station-indicator {
+  background: #4caf50;
+  box-shadow: 0 0 6px #4caf50;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.station.connecting .station-indicator {
+  background: #ff9800;
+  box-shadow: 0 0 6px #ff9800;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.station.error .station-indicator { background: #e53935; animation: none; box-shadow: none; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(.75); }
+}
+.video-wrapper {
+  background: #000;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 50vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,.15);
+}
+.video-wrapper video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+</style>
+</head>
+<body>
+<div class="video-wrapper">
+  <video id="tv" autoplay playsinline controls></video>
+</div>
+<ul class="stations" id="stations"></ul>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<script>
+const STATIONS = [
+  { name: 'АВТО24', icon: '🚘', url: 'https://stream8.cinerama.uz/1430/tracks-v1a1/mono.m3u8' },
+  { name: 'Беларусь 1', icon: '📺', url: 'https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus1/playlist.m3u8' },
+  { name: 'Беларусь 2', icon: '🍿', url: 'https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus2/playlist.m3u8' },
+  { name: 'Беларусь 3', icon: '🏛️', url: 'https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus3/playlist.m3u8' },
+  { name: 'Беларусь 4', icon: '🏞️', url: 'https://live.dc.beltelecom.by/vtv/bt4.stream/playlist.m3u8' },
+  { name: 'Беларусь 5', icon: '🏆', url: 'https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus5/playlist.m3u8' },
+  { name: 'Беларусь 24', icon: '📡', url: 'https://ngtrk.dc.beltelecom.by/ngtrk/smil:belarus24/playlist.m3u8' },
+  { name: 'Доктор', icon: '🏥', url: 'https://stream8.cinerama.uz/1409/tracks-v1a1/mono.m3u8' },
+  { name: 'Живая Планета', icon: '🌿', url: 'https://stream8.cinerama.uz/1250/tracks-v1a1/mono.m3u8' },
+  { name: 'История', icon: '📜', url: 'https://stream8.cinerama.uz/1266/tracks-v1a1/mono.m3u8' },
+  { name: 'Карусель', icon: '🎠', url: 'https://zabava-htlive.cdn.ngenix.net/hls/CH_KARUSEL/variant.m3u8' },
+  { name: 'Моя Планета', icon: '🌍', url: 'https://stream8.cinerama.uz/1247/tracks-v1a1/mono.m3u8' },
+  { name: 'Муз-ТВ', icon: '🎵', url: 'https://zabava-htlive.cdn.ngenix.net/hls/CH_MUZTV/variant.m3u8' },
+  { name: 'Наука', icon: '🔬', url: 'https://stream8.cinerama.uz/1248/tracks-v1a1/mono.m3u8' },
+  { name: 'Охота и рыбалка', icon: '🎣', url: 'https://stream8.cinerama.uz/1038/tracks-v1a1/mono.m3u8' },
+  { name: 'Первый информационный', icon: '📰', url: 'https://ngtrk.dc.beltelecom.by/ngtrk/smil:informacionnyy/playlist.m3u8' },
+  { name: 'СТВ', icon: '🏙️', url: 'https://ngtrk.dc.beltelecom.by/ctv/ctv.stream/playlist.m3u8' },
+  { name: 'СТС', icon: '😂', url: 'https://zabava-htlive.cdn.ngenix.net/hls/CH_STS/variant.m3u8' },
+  { name: 'СТС Love', icon: '🩷', url: 'https://zabava-htlive.cdn.ngenix.net/hls/CH_STSLOVE/variant.m3u8' },
+  { name: 'Т24', icon: '⚙️', url: 'https://stream8.cinerama.uz/1037/tracks-v1a1/mono.m3u8' },
+  { name: '2x2', icon: '🤘', url: 'https://zabava-htlive.cdn.ngenix.net/hls/CH_2X2/variant.m3u8' }
+];
+
+const tv = document.getElementById('tv');
+const list = document.getElementById('stations');
+let hls = null, activeIndex = -1, nodes = [], playAttempt = 0;
+
+function render() {
+  list.innerHTML = STATIONS.map((s, i) =>
+    `<li class="station" data-index="${i}">
+      <span class="station-icon">${s.icon}</span>
+      <span class="station-name">${s.name}</span>
+      <span class="station-indicator"></span>
+    </li>`
+  ).join('');
+  nodes = [...list.children];
+}
+
+function setActive(idx) {
+  nodes.forEach((el, i) => {
+    el.classList.toggle('active', i === idx && idx >= 0);
+    el.classList.remove('error', 'connecting');
+  });
+  activeIndex = idx;
+}
+
+function stop() {
+  if (hls) { hls.destroy(); hls = null; }
+  tv.onerror = null;
+  tv.onended = null;
+  tv.pause();
+  tv.removeAttribute('src');
+  tv.load();
+  setActive(-1);
+}
+
+function play(idx) {
+  const id = ++playAttempt;
+  const station = STATIONS[idx];
+  const el = nodes[idx];
+  el.classList.add('connecting');
+
+  if (typeof Hls === 'undefined' || !Hls.isSupported()) {
+    el.classList.replace('connecting', 'error');
+    return;
+  }
+  if (hls) hls.destroy();
+  tv.onerror = null;
+  hls = new Hls();
+  hls.loadSource(station.url);
+  hls.attachMedia(tv);
+  hls.on(Hls.Events.MANIFEST_PARSED, () => {
+    if (id !== playAttempt) return;
+    el.classList.remove('connecting');
+    setActive(idx);
+    tv.play().catch(() => {
+      if (id !== playAttempt) return;
+      el.classList.replace('active', 'error'); setActive(-1);
+    });
+  });
+  hls.on(Hls.Events.ERROR, (_, data) => {
+    if (data.fatal && id === playAttempt) { el.classList.remove('active', 'connecting'); el.classList.add('error'); setActive(-1); }
+  });
+}
+
+function toggle(idx) {
+  if (idx === activeIndex) { stop(); return; }
+  stop();
+  play(idx);
+}
+
+list.addEventListener('click', e => {
+  const item = e.target.closest('.station');
+  if (!item) return;
+  toggle(+item.dataset.index);
+});
+
+render();
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') stop();
+});
+</script>
+</body>
+</html>
